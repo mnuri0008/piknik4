@@ -1,0 +1,19 @@
+{
+  "name": "Picnic Vakti",
+  "short_name": "Picnic Vakti",
+  "description": "Piknik planlarını kolayca oluştur, paylaş ve organize et!",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FF6600",
+
+  "icons": [
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Piknik Vakti — {{ code }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <a href="/" class="badge">← Geri</a>
+    <div class="lang">
+      <a href="?username={{ username }}&lang=tr{{ '&view=1' if view else '' }}" class="{{ 'active' if lang=='tr' else '' }}" data-lang="tr">🇹🇷 TR</a>
+      <a href="?username={{ username }}&lang=en{{ '&view=1' if view else '' }}" class="{{ 'active' if lang=='en' else '' }}" data-lang="en">🇬🇧 EN</a>
+    </div>
+  </div>
+
+  <h1>📅 Piknik Vakti — {{ code if not view else (code[:2] + '**') }}</h1>
+  <div class="small">
+    <span id="date">—</span> ·
+    <b id="user">{{ username }}</b>
+    {% if view %} · <b id="readonly">🔒 Sadece görüntülüyorsunuz</b>{% endif %}
+  </div>
+
+  <div class="card">
+    <h2>⚡ Hızlı ekle</h2>
+    <div id="cats" class="chips"></div>
+    <hr class="chips-sep">
+    <div id="subchips" class="chips"></div>
+
+    <div class="row" style="margin-top:10px">
+      <input id="itemName" placeholder="Ürün adı (örn. Kaşar)">
+      <select id="unit">
+        <option value="kg">kg</option>
+        <option value="adet">adet</option>
+        <option value="lt">lt</option>
+      </select>
+      <input id="amount" value="1">
+      <button id="add" class="primary" {% if view %}disabled{% endif %}>Ekle</button>
+    </div>
+    <div id="quick" class="quick"></div>
+  </div>
+
+  <div class="card">
+    <h2>🧺 Ürünler</h2>
+    <div id="list" class="list"></div>
+  </div>
+</div>
+
+<script>
+/* ====== Room data / list loop – mevcut işleyiş korunur ====== */
+const ROOM   ="{{ code }}";
+const USER   ="{{ username }}";
+const VIEW   = {{ 'true' if view else 'false' }};
+
+/* --------- KANONİK KATEGORİ MODELİ (TR + EN + emoji) ---------- */
+const CATS = [
+  {
+    key:'fruit', icon:'🍓', tr:'Meyve', en:'Fruit',
+    subs:[
+      {icon:'🍎', tr:'Elma',      en:'Apple'},
+      {icon:'🍐', tr:'Armut',     en:'Pear'},
+      {icon:'🍇', tr:'Üzüm',      en:'Grapes'},
+      {icon:'🍉', tr:'Karpuz',    en:'Watermelon'},
+      {icon:'🍊', tr:'Portakal',  en:'Orange'},
+      {icon:'🍌', tr:'Muz',       en:'Banana'},
+      {icon:'🍊', tr:'Mandalina', en:'Mandarin'},
+      {icon:'🍓', tr:'Çilek',     en:'Strawberry'},
+      {icon:'🍑', tr:'Şeftali',   en:'Peach'},
+      {icon:'🍈', tr:'Kavun',     en:'Melon'},
+    ]
+  },
+  { key:'veg',   icon:'🥒', tr:'Sebze',            en:'Vegetables',
+    subs:[
+      {icon:'🍅', tr:'Domates',     en:'Tomato'},
+      {icon:'🧅', tr:'Soğan',       en:'Onion'},
+      {icon:'🫑', tr:'Biber',       en:'Pepper'},
+      {icon:'🥔', tr:'Patates',     en:'Potato'},
+      {icon:'🌽', tr:'Mısır (koçan)', en:'Corn (cob)'},
+      {icon:'🥬', tr:'Marul',       en:'Lettuce'},
+      {icon:'🥬', tr:'Roka',        en:'Arugula'},
+      {icon:'🍄', tr:'Mantar',      en:'Mushroom'},
+      {icon:'🧄', tr:'Sarımsak',    en:'Garlic'},
+      {icon:'🍆', tr:'Patlıcan',    en:'Eggplant'},
+    ]
+  },
+  { key:'bbq',   icon:'🥩', tr:'Et/Mangal',        en:'Grill/BBQ',
+    subs:[
+      {icon:'🥩', tr:'Köfte',       en:'Meatball'},
+      {icon:'🍗', tr:'Tavuk',       en:'Chicken'},
+      {icon:'🌭', tr:'Sucuk',       en:'Sausage'},
+      {icon:'🍖', tr:'Mangal',      en:'Grill'},
+      {icon:'🧰', tr:'Izgara Teli', en:'Grill Net'},
+      {icon:'🪨', tr:'Mangal Kömürü', en:'Charcoal'},
+      {icon:'🍢', tr:'Şiş',         en:'Skewer'},
+    ]
+  },
+  { key:'bakery',icon:'🍞', tr:'Ekmek/Unlu',       en:'Bakery',
+    subs:[
+      {icon:'🥖', tr:'Ekmek',   en:'Bread'},
+      {icon:'🫓', tr:'Lavaş',   en:'Lavash'},
+      {icon:'🥯', tr:'Simit',   en:'Bagel'},
+      {icon:'🫓', tr:'Tortilla',en:'Tortilla'},
+    ]
+  },
+  { key:'dairy', icon:'🧀', tr:'Peynir/Şarküteri', en:'Dairy/Charcuterie',
+    subs:[
+      {icon:'🧀', tr:'Kaşar',        en:'Cheddar'},
+      {icon:'🧀', tr:'Beyaz Peynir', en:'White Cheese'},
+      {icon:'🥪', tr:'Sucuk Dilim',  en:'Sausage Slices'},
+      {icon:'🥪', tr:'Salam',        en:'Salami'},
+      {icon:'🌭', tr:'Sosis',        en:'Hot Dog'},
+    ]
+  },
+  { key:'salad', icon:'🥗', tr:'Salata/Meze',     en:'Salads/Mezes',
+    subs:[
+      {icon:'🥗', tr:'Mevsim Salata', en:'Season Salad'},
+      {icon:'🥗', tr:'Gavurdağı',     en:'Gavurdagi'},
+      {icon:'🫘', tr:'Humus',         en:'Hummus'},
+      {icon:'🥣', tr:'Haydari',       en:'Haydari'},
+      {icon:'🌶️', tr:'Acılı Ezme',   en:'Spicy Ezme'},
+      {icon:'🥫', tr:'Mayonez',       en:'Mayonnaise'},
+      {icon:'🥫', tr:'Ketçap',        en:'Ketchup'},
+      {icon:'🥫', tr:'Hardal',        en:'Mustard'},
+      {icon:'🌿', tr:'Maydanoz',      en:'Parsley'},
+    ]
+  },
+  { key:'drink', icon:'🥤', tr:'İçecek',          en:'Drinks',
+    subs:[
+      {icon:'💧', tr:'Su',          en:'Water'},
+      {icon:'🥤', tr:'Kola',        en:'Cola'},
+      {icon:'🥛', tr:'Ayran',       en:'Ayran'},
+      {icon:'🫗', tr:'Maden Suyu',  en:'Mineral Water'},
+      {icon:'🥤', tr:'Gazoz',       en:'Soda Pop'},
+    ]
+  },
+  { key:'cond',  icon:'🧂', tr:'Sos/Condiment',   en:'Sauces/Condiments',
+    subs:[
+      {icon:'🧂', tr:'Tuz',       en:'Salt'},
+      {icon:'🧂', tr:'Karabiber', en:'Black Pepper'},
+      {icon:'🌶️', tr:'Pul Biber', en:'Chili Flakes'},
+      {icon:'🧂', tr:'Sumak',     en:'Sumac'},
+      {icon:'🧂', tr:'Kimyon',    en:'Cumin'},
+    ]
+  },
+  { key:'brk',   icon:'🍯', tr:'Kahvaltılık',     en:'Breakfast',
+    subs:[
+      {icon:'🫒', tr:'Zeytin', en:'Olives'},
+      {icon:'🍯', tr:'Reçel',  en:'Jam'},
+      {icon:'🍯', tr:'Bal',    en:'Honey'},
+      {icon:'🥫', tr:'Tahin',  en:'Tahini'},
+      {icon:'🥫', tr:'Pekmez', en:'Molasses'},
+    ]
+  },
+  { key:'hyg',   icon:'🧽', tr:'Temizlik/Hijyen', en:'Cleaning/Hygiene',
+    subs:[
+      {icon:'🧻', tr:'Islak Mendil',       en:'Wet Wipes'},
+      {icon:'🧻', tr:'Peçete',             en:'Napkin'},
+      {icon:'🧴', tr:'Bulaşık Deterjanı',  en:'Dish Soap'},
+      {icon:'🧴', tr:'Sıvı Sabun',         en:'Liquid Soap'},
+    ]
+  },
+  { key:'disp',  icon:'🍽️', tr:'Tek Kullanımlık', en:'Disposable',
+    subs:[
+      {icon:'🍽️', tr:'Tabak',  en:'Plate'},
+      {icon:'🥤', tr:'Bardak',  en:'Cup'},
+      {icon:'🍴', tr:'Çatal',  en:'Fork'},
+      {icon:'🔪', tr:'Bıçak',  en:'Knife'},
+      {icon:'🥄', tr:'Kaşık',  en:'Spoon'},
+    ]
+  },
+  { key:'cool',  icon:'🧊', tr:'Soğutma/Buz',     en:'Cooling/Ice',
+    subs:[
+      {icon:'🧊', tr:'Buz',       en:'Ice'},
+      {icon:'🧊', tr:'Soğutucu',  en:'Cooler'},
+      {icon:'🧊', tr:'Buz Aküsü', en:'Ice Pack'},
+    ]
+  },
+  { key:'tools', icon:'🧰', tr:'Ekipman/Alet',    en:'Equipment/Tool',
+    subs:[
+      {icon:'🔪', tr:'Kesme Tahtası', en:'Cutting Board'},
+      {icon:'🔪', tr:'Bıçak',         en:'Knife Tool'},
+      {icon:'🛠️', tr:'Maşa',         en:'Tongs'},
+      {icon:'🗑️', tr:'Çöp Poşeti',   en:'Trash Bag'},
+    ]
+  },
+  { key:'other', icon:'❇️', tr:'Diğer',           en:'Other',
+    subs:[
+      {icon:'🎲', tr:'Oyun',            en:'Game'},
+      {icon:'🔊', tr:'Müzik Hoparlör',  en:'Speaker'},
+      {icon:'🧺', tr:'Piknik Örtüsü',   en:'Picnic Blanket'},
+    ]
+  },
+];
+
+/* label -> icon reverse map (TR ve EN) */
+const LABEL_MAP = {};
+(function buildLabelMap(){
+  for(const c of CATS){
+    LABEL_MAP[c.tr.toLowerCase()] = c.icon;
+    LABEL_MAP[c.en.toLowerCase()] = c.icon;
+    for(const s of c.subs){
+      LABEL_MAP[s.tr.toLowerCase()] = s.icon;
+      LABEL_MAP[s.en.toLowerCase()] = s.icon;
+    }
+  }
+})();
+function iconFor(label){
+  return LABEL_MAP[(label||'').toLowerCase()] || '🧺';
+}
+
+/* ---------- Dil yardımcıları ---------- */
+function getLang(){ return (localStorage.getItem('lang') || document.documentElement.lang || '{{ lang }}' || 'tr').toLowerCase(); }
+function setLang(l){ localStorage.setItem('lang', l); document.documentElement.lang = l; }
+
+/* ---------- Birim önerisi & hızlı miktar ---------- */
+function inferUnitByName(n){
+  const s=(n||'').toLowerCase();
+  const LIQ_TR = ['su','ayran','kola','gazoz','maden'];
+  const LIQ_EN = ['water','cola','soda','mineral'];
+  const PCS_TR = ['ekmek','lavaş','simit','ketçap','mayonez','hardal','tabak','bardak','çatal','bıçak','kaşık','ızgara','mangal','kömürü','şiş','peçete','ıslak','buz','aküsü','soğutucu','kesme','maşa','çöp','humus','haydari'];
+  const PCS_EN = ['bread','lavash','bagel','ketchup','mayonnaise','mustard','plate','cup','fork','knife','spoon','grill','charcoal','skewer','napkin','wipe','ice','cooler','cutting','tongs','trash','hummus','haydari'];
+  if ([...LIQ_TR, ...LIQ_EN].some(k=>s.includes(k))) return 'lt';
+  if ([...PCS_TR, ...PCS_EN].some(k=>s.includes(k))) return 'adet';
+  return 'kg';
+}
+function quickSetFor(unit){
+  if(unit==='kg') return [0.5,1,2,3,4,5];
+  if(unit==='lt') return [0.5,1,2,5,10];
+  return [0.5,1,2,3,5];
+}
+
+/* ---------- UI bağlantıları ---------- */
+const catsDiv   = document.getElementById('cats');
+const subsDiv   = document.getElementById('subchips');
+const nameInp   = document.getElementById('itemName');
+const unitSel   = document.getElementById('unit');
+const amountInp = document.getElementById('amount');
+const quickDiv  = document.getElementById('quick');
+const listDiv   = document.getElementById('list');
+
+let CURRENT_CAT = null;
+let OWNER = '';
+
+/* ---------- Kategori & alt ürün çizimi (dile göre) ---------- */
+function renderCategories(lang){
+  if(!catsDiv) return;
+  catsDiv.innerHTML='';
+  CATS.forEach(c=>{
+    const b=document.createElement('button');
+    b.type='button';
+    b.className='chip';
+    b.dataset.key=c.key;
+    b.innerHTML = `${c.icon} ${c[lang]}`;
+    b.onclick=()=>{ CURRENT_CAT=c; renderSubchips(lang); };
+    catsDiv.appendChild(b);
+  });
+}
+function renderSubchips(lang, existingNames=[]){
+  if(!subsDiv) return;
+  subsDiv.innerHTML='';
+  if(!CURRENT_CAT) return;
+  const exist = new Set(existingNames.map(s=>s.toLowerCase()));
+  CURRENT_CAT.subs.forEach(s=>{
+    const label = `${s.icon} ${s[lang]}`;
+    const chip  = document.createElement('button');
+    chip.type='button';
+    chip.className='chip'+(exist.has(s[lang].toLowerCase())?' disabled':'');
+    chip.innerHTML=label;
+    chip.onclick=()=>{
+      nameInp.value = s[lang];
+      const u = inferUnitByName(nameInp.value);
+      unitSel.value = u;
+      renderQuickChips(lang);
+    };
+    subsDiv.appendChild(chip);
+  });
+}
+
+/* ---------- Hızlı miktar çipleri ---------- */
+function renderQuickChips(lang){
+  if(!quickDiv) return;
+  quickDiv.innerHTML='';
+  const unit = unitSel.value || 'kg';
+  const suffix = (lang==='tr') ? {kg:'kg', lt:'lt', adet:'adet'} : {kg:'kg', lt:'L', adet:'pcs'};
+  quickSetFor(unit).forEach(n=>{
+    const chip=document.createElement('button');
+    chip.type='button'; chip.className='chip';
+    chip.textContent=`${n} ${suffix[unit]||unit}`;
+    chip.onclick=()=>{ amountInp.value=n; if(!VIEW) addItem(); };
+    quickDiv.appendChild(chip);
+  });
+}
+
+/* ---------- Sunucu API ---------- */
+async function getRoom(){
+  const r=await fetch(`/api/room/${ROOM}`);
+  return await r.json();
+}
+async function addItemAPI(body){
+  const r=await fetch(`/api/room/${ROOM}/items`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  if(!r.ok){ alert(await r.text()); }
+}
+async function patchItem(id,state){
+  await fetch(`/api/room/${ROOM}/items/${id}`,{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({user:USER,state})
+  });
+}
+async function deleteItem(id){
+  await fetch(`/api/room/${ROOM}/items/${id}?user=${encodeURIComponent(USER)}`,{method:'DELETE'});
+}
+function canEdit(owner,u){ return !VIEW && (USER===u || USER===owner); }
+
+/* ---------- Liste çizimi ---------- */
+function renderList(items){
+  listDiv.innerHTML='';
+  const names = items.map(i=>i.name);
+  renderSubchips(getLang(), names);  // mevcut isimleri gizle
+  items.forEach(it=>{
+    const row=document.createElement('div');
+    row.className='item '+(it.state==='needed'?'needed':(it.state==='brought'?'brought':''));
+
+    const left=document.createElement('div'); left.className='item-left';
+    const title=document.createElement('div'); title.className='item-title';
+    title.textContent=`${iconFor(it.name)} ${it.name} — ${it.amount} ${it.unit}`;
+    const meta=document.createElement('div'); meta.className='item-meta';
+    meta.textContent=`${it.cat} · @${it.user}`;
+    left.append(title,meta);
+
+    const act=document.createElement('div'); act.className='actions';
+    const bN=document.createElement('button'); bN.className='btn state needed'+(it.state==='needed'?' active':''); bN.textContent='Eksik';
+    const bC=document.createElement('button'); bC.className='btn state claimed'+(it.state==='claimed'?' active':''); bC.textContent='Ayrılan';
+    const bB=document.createElement('button'); bB.className='btn state brought'+(it.state==='brought'?' active':''); bB.textContent='Getirildi';
+    const del=document.createElement('button'); del.className='btn'; del.textContent='Sil';
+
+    if(canEdit(OWNER,it.user)){
+      bN.onclick=()=>patchItem(it.id,'needed');
+      bC.onclick=()=>patchItem(it.id,'claimed');
+      bB.onclick=()=>patchItem(it.id,'brought');
+      del.onclick=()=>deleteItem(it.id);
+    }else{
+      [bN,bC,bB,del].forEach(b=>{b.disabled=true; b.style.opacity=.5;});
+    }
+    act.append(bN,bC,bB,del);
+    row.append(left,act);
+    listDiv.appendChild(row);
+  });
+}
+
+/* ---------- Ürün ekleme (buton ya da hızlı çip) ---------- */
+async function addItem(){
+  let name=(nameInp.value||'').trim();
+  if(!name){ alert(getLang()==='tr'?'Ürün adı gerekli':'Item name required'); return; }
+  const unit = unitSel.value || inferUnitByName(name);
+  let amount = parseFloat(amountInp.value||'1'); if(isNaN(amount)||amount<=0) amount=1;
+
+  const lang = getLang();
+  const catLabel = CURRENT_CAT ? CURRENT_CAT[lang] : (lang==='tr'?'Diğer':'Other');
+
+  await addItemAPI({name,unit,amount,cat:catLabel,user:USER});
+  nameInp.value='';
+}
+
+/* ---------- Döngü ---------- */
+async function loop(){
+  try{
+    const data=await getRoom();
+    OWNER = data.owner || OWNER;
+    const dateEl=document.getElementById('date');
+    if(dateEl) dateEl.textContent = data.date || '—';
+    renderList(data.items || []);
+  }catch(e){}
+  setTimeout(loop, 2000);
+}
+
+/* ======= I18N: statik metinler + liste butonları ======= */
+const UI = {
+  tr: {
+    back:"← Geri", quick_add:"Hızlı ekle", items:"Ürünler", add:"Ekle",
+    needed:"Eksik", claimed:"Ayrılan", brought:"Getirildi",
+    ph_item:"Ürün adı (örn. Kaşar)", unit_kg:"kg", unit_lt:"lt", unit_adet:"adet",
+    readonly:"🔒 Sadece görüntülüyorsunuz"
+  },
+  en: {
+    back:"← Back", quick_add:"Quick add", items:"Items", add:"Add",
+    needed:"Needed", claimed:"Claimed", brought:"Brought",
+    ph_item:"Item name (e.g. Cheddar)", unit_kg:"kg", unit_lt:"L", unit_adet:"pcs",
+    readonly:"🔒 View-only"
+  }
+};
+
+function translateStatic(){
+  const L = UI[getLang()];
+  // başlıklar
+  document.querySelectorAll('h2').forEach(h=>{
+    const t = h.textContent.toLowerCase();
+    if(t.includes('hızlı') || t.includes('quick')) {
+      h.childNodes.forEach(n=>{ if(n.nodeType===3) n.textContent=' '+L.quick_add; });
+    }
+    if(t.includes('ürün') || t.includes('items')) {
+      h.childNodes.forEach(n=>{ if(n.nodeType===3) n.textContent=' '+L.items; });
+    }
+  });
+  const back = document.querySelector('.header a.badge'); if(back) back.textContent=L.back;
+  const ro = document.getElementById('readonly'); if(ro) ro.textContent=L.readonly;
+  const addBtn=document.getElementById('add'); if(addBtn) addBtn.textContent=L.add;
+  if(nameInp) nameInp.placeholder=L.ph_item;
+  if(unitSel){
+    const o=unitSel.options;
+    if(o[0]) o[0].text=L.unit_kg;
+    if(o[1]) o[1].text=L.unit_adet;
+    if(o[2]) o[2].text=L.unit_lt;
+  }
+}
+
+function translateList(){
+  const L = UI[getLang()];
+  document.querySelectorAll('.btn.state.needed').forEach(b=>b.textContent=L.needed);
+  document.querySelectorAll('.btn.state.claimed').forEach(b=>b.textContent=L.claimed);
+  document.querySelectorAll('.btn.state.brought').forEach(b=>b.textContent=L.brought);
+  document.querySelectorAll('.item .item-title').forEach(t=>{
+    const m = t.textContent.match(/—\s*([0-9.]+)\s*(kg|lt|l|adet|pcs)/i);
+    if(m){
+      const num=m[1]; let u=(m[2]||'kg').toLowerCase();
+      let out=L.unit_kg; if(u==='lt'||u==='l') out=L.unit_lt; if(u==='adet'||u==='pcs') out=L.unit_adet;
+      t.textContent = t.textContent.replace(/—\s*[0-9.]+\s*(kg|lt|l|adet|pcs)/i, `— ${num} ${out}`);
+    }
+  });
+}
+
+/* ---------- Dil uygulama ---------- */
+function applyLanguage(){
+  const lang=getLang();
+  translateStatic();
+  renderCategories(lang);
+  const first = CATS[0]; if(first){ CURRENT_CAT=first; renderSubchips(lang); }
+  renderQuickChips(lang);
+  translateList();
+}
+
+/* ---------- Event bağlama ---------- */
+document.addEventListener('DOMContentLoaded', ()=>{
+  applyLanguage();
+  loop();
+  if(unitSel) unitSel.addEventListener('change', ()=>renderQuickChips(getLang()));
+  if(nameInp) nameInp.addEventListener('input', ()=>{
+    const u=inferUnitByName(nameInp.value||''); unitSel.value=u; renderQuickChips(getLang());
+  });
+});
+document.querySelectorAll('.lang a[data-lang]').forEach(a=>{
+  a.addEventListener('click', (e)=>{
+    e.preventDefault();
+    setLang((a.dataset.lang||'tr').toLowerCase());
+    applyLanguage();
+  });
+});
+// Dinamik liste yenilemeleri için küçük tazeleme
+setInterval(translateList, 1200);
+</script>
+</body>
+</html>

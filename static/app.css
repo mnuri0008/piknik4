@@ -1,0 +1,38 @@
+:root{--bg:#0f1722;--card:#111a28;--text:#e8eef9;--muted:#a7b3c6;--brand:#46d391;--chip:#0e2238;--chip-on:#173a60;--red:#ff6b6b;--green:#46d391;--violet:#9b8cff;}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,Segoe UI,Roboto,Helvetica,Arial}
+.container{max-width:980px;margin:24px auto;padding:0 16px}
+.header{display:flex;align-items:center;gap:12px;justify-content:space-between;margin-bottom:8px}
+h1{font-size:28px;margin:0}
+.badge{padding:6px 10px;border-radius:10px;background:#0c1420;color:#fff;text-decoration:none}
+.lang a{margin-left:8px;text-decoration:none;color:var(--muted);padding:4px 8px;border-radius:8px;background:#0c1420}
+.lang a.active{background:#1c2b42;color:#fff}
+.card{background:var(--card);border:1px solid #21324a;border-radius:14px;padding:16px;margin:14px 0}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+input,select,button{height:40px;border-radius:10px;border:1px solid #203048;background:#0b1726;color:#e8eef9;padding:0 12px}
+button.primary{background:var(--brand);color:#04120b;border:none;font-weight:600}
+.small{color:var(--muted);font-size:13px}
+hr.soft{border:0;height:1px;background:linear-gradient(90deg,transparent,#27415f,transparent);margin:10px 0}
+
+/* chips */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:var(--chip);border:1px solid #1b2e45;color:#dbe7ff;padding:8px 12px;border-radius:999px;cursor:pointer}
+.chip:hover{background:var(--chip-on)}
+.chip.disabled{opacity:.45;pointer-events:none}
+.chips-sep{border:0;height:1px;background:linear-gradient(90deg,transparent,#355577,transparent);margin:10px 0}
+
+/* quick */
+.quick{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.quick .chip{background:#0f2440}
+
+/* list */
+.list{display:flex;flex-direction:column;gap:10px}
+.item{display:flex;justify-content:space-between;align-items:center;background:#0e1a2b;border:1px solid #23334a;border-radius:12px;padding:10px 12px}
+.item.needed{background:linear-gradient(0deg,#1f0f0f,#0e1a2b)}
+.item.brought{box-shadow:0 0 0 2px var(--violet) inset}
+.item-title{font-weight:600}
+.item-meta{color:var(--muted);font-size:13px;margin-top:2px}
+.actions{display:flex;gap:8px}
+.btn{height:34px;padding:0 12px;border-radius:999px;border:1px solid #324a69;background:#0b1422;color:#e5efff}
+.btn.state.needed.active{background:#2b1313;border-color:#6d2b2b}
+.btn.state.brought.active{background:#13301f;border-color:#2a6d45}
+.btn.state.claimed.active{background:#2a2441;border-color:#6a5de6}

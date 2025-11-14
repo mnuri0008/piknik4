@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Piknik Vakti</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+
+<!-- ✅ Manifest ve Service Worker bağlantıları -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#FF6600">
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js');
+  }
+</script>
+
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>📅 Piknik Vakti</h1>
+    <div class="lang">
+      <a href="#" data-lang="tr" class="active">🇹🇷 TR</a>
+      <a href="#" data-lang="en">🇬🇧 EN</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="title_create">Oda oluştur veya katıl</h2>
+    <div class="row">
+      <input id="name" placeholder="İsmin">
+      <input id="date" type="datetime-local">
+      <button id="create" class="primary" data-i18n="btn_create">Oda Oluştur</button>
+    </div>
+    <hr class="soft">
+    <div class="row">
+      <input id="join-name" placeholder="İsmin (katıl)">
+      <input id="join-code" placeholder="4 haneli kod">
+      <button id="join" class="primary" data-i18n="btn_join">Koda Göre Katıl</button>
+    </div>
+    <footer class="small" data-i18n="hint">Kod sadece paylaşılan kişilerle çalışır.</footer>
+  </div>
+
+  <div class="card">
+    <h2>📘 <span data-i18n="guide">Kısa Kullanım Kılavuzu</span></h2>
+    <ul class="small">
+      <li data-i18n="g1">Oda oluşturanda 4 haneli kod atanır ve owner olur.</li>
+      <li data-i18n="g2">Katılan kullanıcı kod + ismini yazar.</li>
+      <li data-i18n="g3">Durumlar: Eksik → Ayrılan → Getirildi.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>🧺 <span data-i18n="rooms">Odalar</span></h2>
+    {% if rooms %}
+      {% for r in rooms %}
+        <div class="item">
+          <div class="item-left">
+            <div class="item-title">{{ r.date }}</div>
+            <div class="item-meta">{{ r.items }} ürün</div>
+          </div>
+          <div class="actions">
+            <!-- “Gör” = sadece görüntüleme -->
+            <a class="btn" href="/room/{{ r.code }}?view=1" data-i18n="see">Gör</a>
+            <span class="small" title="Oda kodu">{{ r.mask }}</span>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="small" data-i18n="no_rooms">Henüz oda yok.</div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+const tr = {
+  title_create:"Oda oluştur veya katıl", btn_create:"Oda Oluştur", btn_join:"Koda Göre Katıl",
+  hint:"Kod sadece paylaşılan kişilerle çalışır.", guide:"Kısa Kullanım Kılavuzu",
+  g1:"Oda oluşturanda 4 haneli kod atanır ve owner olur.", g2:"Katılan kullanıcı kod + ismini yazar.",
+  g3:"Durumlar: Eksik → Ayrılan → Getirildi.", rooms:"Odalar", see:"Gör", no_rooms:"Henüz oda yok."
+};
+const en = {
+  title_create:"Create or join a room", btn_create:"Create Room", btn_join:"Join by Code",
+  hint:"Works only for people who get the shared code.", guide:"Quick User Guide",
+  g1:"Creator gets a 4-digit code and becomes owner.", g2:"Joiners write code + name.",
+  g3:"States: Needed → Claimed → Brought.", rooms:"Rooms", see:"View", no_rooms:"No rooms yet."
+};
+
+function setLang(lang){
+  const t = lang==='en'?en:tr;
+  document.querySelectorAll("[data-i18n]").forEach(el=>{
+    el.textContent = t[el.dataset.i18n] || el.textContent;
+  });
+  document.querySelectorAll(".lang a").forEach(a=>a.classList.toggle("active", a.dataset.lang===lang));
+  localStorage.setItem("lang", lang);
+}
+
+document.querySelectorAll(".lang a").forEach(a=>{
+  a.onclick = (e)=>{ e.preventDefault(); setLang(a.dataset.lang); };
+});
+setLang(localStorage.getItem("lang")||"tr");
+
+// Room create/join
+function four(){return Math.floor(1000+Math.random()*9000).toString();}
+async function createRoomOnServer(code, owner, date){
+  await fetch("/api/room",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({code,owner,date})});
+}
+document.getElementById("create").onclick = async ()=>{
+  const n = (document.getElementById("name").value||"").trim();
+  if(!n){ alert("İsmini yaz / Enter your name"); return; }
+  const d = document.getElementById("date").value;
+  const code = four();
+  await createRoomOnServer(code, n, d);
+  location.href = `/room/${code}?username=${encodeURIComponent(n)}&lang=${localStorage.getItem("lang")||"tr"}`;
+};
+document.getElementById("join").onclick = ()=>{
+  const n=(document.getElementById("join-name").value||"").trim();
+  const c=(document.getElementById("join-code").value||"").trim();
+  if(!n||!c){ alert("İsim ve kod gerekli / Name & code required"); return; }
+  location.href = `/room/${c}?username=${encodeURIComponent(n)}&lang=${localStorage.getItem("lang")||"tr"}`;
+};
+</script>
+</body>
+</html>
