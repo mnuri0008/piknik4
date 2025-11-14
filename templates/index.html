@@ -9,6 +9,10 @@
 <!-- ✅ Manifest ve Service Worker bağlantıları -->
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#FF6600">
+
+<!-- ✅ Android / tarayıcı favicon ve uygulama ikonu -->
+<link rel="icon" type="image/png" href="/static/icons/icon-192.png">
+
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/service-worker.js');
@@ -97,7 +101,10 @@ function setLang(lang){
 }
 
 document.querySelectorAll(".lang a").forEach(a=>{
-  a.onclick = (e)=>{ e.preventDefault(); setLang(a.dataset.lang); };
+  a.onclick = (e)=>{
+    e.preventDefault();
+    setLang(a.dataset.lang);
+  };
 });
 setLang(localStorage.getItem("lang")||"tr");
 
