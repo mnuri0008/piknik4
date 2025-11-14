@@ -1,0 +1,74 @@
+name: Build Android AAB (Capacitor – no prompts)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      APP_ID: com.onrender.picnic3
+      APP_NAME: "Picnic Vakti"
+      SITE_URL: https://picnic-3.onrender.com
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
+      # Keystore için varsayılanlar (secret yoksa bile build edebilsin)
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS != '' && secrets.KEY_ALIAS || 'upload' }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD != '' && secrets.KEYSTORE_PASSWORD || 'picnic123' }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD != '' && secrets.KEY_PASSWORD || 'picnic123' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Eğer web tarafında build gerekiyorsa (React/Vue vs.) burada yap
+      - name: Install npm deps
+        working-directory: mobile
+        run: npm ci
+
+      - name: Build web assets
+        working-directory: mobile
+        run: |
+          # Projene göre düzenle:
+          # npm run build
+          npm run build || echo "Özel build komutun yoksa bu satırı proje komutuna göre değiştir"
+
+      - name: Sync Capacitor Android
+        working-directory: mobile
+        run: npx cap sync android
+
+      # 🔥 İŞTE İKON BLOĞU
+      - name: Generate Android icons (Capacitor)
+        working-directory: mobile
+        run: |
+          npx capacitor-assets android --iconPath resources/icon.png
+
+      - name: Build AAB (bundleRelease)
+        working-directory: mobile/android
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME }}
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon clean bundleRelease
+          ls -lah app/build/outputs/bundle/release
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: picnic-capacitor-aab
+          path: mobile/android/app/build/outputs/bundle/release/*.aab
+
